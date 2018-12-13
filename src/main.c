@@ -83,7 +83,7 @@ int main(void)
                   for Straight line
   -----------------------------------------------------*/
 
-  struct encoder_values encoders;
+  struct encoder_values encoders_values;
 
   struct PID_variables pid_v_encoders;
   struct PID_constants pid_k_encoders;
@@ -157,9 +157,30 @@ int main(void)
                             //   pid_v.error = calculo_erro(s.boo, &modo_agv);
                             //   control_motor_PID(-127);
                             pid_v.error = error_old;
-                            PIDvalor = calculo_pid(&pid_v, &pid_k);
-                            control_motor_PID(PIDvalor);
-                            break;
+
+                            if(pid_v.error == 0){
+
+                                        /*STRAIGHT LINE*/
+
+                                /*----------------------------------
+                                           Get Values of Encoders
+                                  -----------------------------------*/
+                                values_encoders(&encoders_values,0,0,&flag_reta);
+
+                                /*-------------- --------------------
+                                            Straight Line
+                                ----------------------------------*/
+
+                                pid_v_encoders.error = calculo_erro_encoder(&encoders_values);
+                                PIDvalor_encoders = calculo_pid(&pid_v_encoders,&pid_k_encoders);
+                                control_motor_PID(PIDvalor_encoders);
+                            }
+                            
+                            else{
+                              PIDvalor = calculo_pid(&pid_v, &pid_k);
+                              control_motor_PID(PIDvalor);
+                              break;
+                            }
                 }
 
                 // if (pid_v.error == 100){
@@ -217,13 +238,13 @@ int main(void)
                 /*----------------------------------
                         Get Values of Encoders
                 -----------------------------------*/
-                values_encoders(&encoders,0,0,&flag_reta);
+                values_encoders(&encoders_values,0,0,&flag_reta);
 
                 /*----------------------------------
                             Straight Line
                 ----------------------------------*/
 
-                pid_v_encoders.error = calculo_erro_encoder(&encoders);
+                pid_v_encoders.error = calculo_erro_encoder(&encoders_values);
                 PIDvalor_encoders = calculo_pid(&pid_v_encoders,&pid_k_encoders);
                 control_motor_PID(PIDvalor_encoders);
 

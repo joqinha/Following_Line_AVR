@@ -3,8 +3,6 @@
 
 #include "adc.h"
 
-//teste
-
 volatile uint8_t flag_leitura, leituraH;
 
 void adc_config(void){
