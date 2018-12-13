@@ -175,7 +175,7 @@ int main(void)
                                 PIDvalor_encoders = calculo_pid(&pid_v_encoders,&pid_k_encoders);
                                 control_motor_PID(PIDvalor_encoders);
                             }
-                            
+
                             else{
                               PIDvalor = calculo_pid(&pid_v, &pid_k);
                               control_motor_PID(PIDvalor);
@@ -258,8 +258,8 @@ int main(void)
                 }
 
 
-                m_itoa(encoders.left,esq);
-                m_itoa(encoders.right,dir);
+                m_itoa(encoders_values.left,esq);
+                m_itoa(encoders_values.right,dir);
                 //
                 memcpy(a, "E", strlen("E")+1);
                 memcpy(a+strlen(a), esq, strlen(esq)+1);
