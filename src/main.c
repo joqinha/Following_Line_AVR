@@ -24,13 +24,14 @@
             (Modo) 0 - parado
             (Modo) 1 - AGV
             (Modo) 2 - controlo manual (bluetooth)
+            (Modo) 3 - "Calibração"
 -------------------------------------------------*/
 
 typedef enum modo_t{
   STOP,
   AGV,
   MANUAL,
-  BACK_HOME
+  CAL
 }modo_t;
 
 int main(void)
@@ -63,17 +64,20 @@ int main(void)
   s.n_canais=4;
   s.canal_atual=0;
 
+  uint8_t threshold = 127; //Default Value of Threshold for Logical Conversion (0 or 1) of ADC Samples
+
   /*----------------------------------------------------
   PID Variables and Values Definitions (Optical Sensors)
   -----------------------------------------------------*/
-  uint8_t modo_agv = 0;
+  uint8_t modo_agv = 1;
+  uint8_t intersection = 0;
 
   struct PID_variables pid_v;
   struct PID_constants pid_k;
 
-  pid_k.Kp = 35;
+  pid_k.Kp = 40; //35, 10
   pid_k.Ki = 0;
-  pid_k.Kd = 10;
+  pid_k.Kd = 30;
 
   int8_t PIDvalor = 0;
   int8_t error_old = 0;
@@ -85,26 +89,34 @@ int main(void)
 
   struct encoder_values encoders_values;
 
+  struct encoder_values inicio_reta;
+  struct encoder_values reta_e;
+
   struct PID_variables pid_v_encoders;
   struct PID_constants pid_k_encoders;
 
-  pid_k_encoders.Kp = 50;
+  pid_k_encoders.Kp = 2;
   pid_k_encoders.Ki = 0;
-  pid_k_encoders.Kd = 0;
+  pid_k_encoders.Kd = 1;
 
-  int8_t PIDvalor_encoders = 0;
+  int16_t PIDvalor_encoders = 0;
+
+  
+  char *string; //String with Values of Encoders
+  uint8_t reta = 0; //Flag No-Line Sector
 
   /*----------------------------------
           Other Variables
   -----------------------------------*/
-  uint8_t dist=0;
-  char a[10];
-  char esq[10];
-  char dir[10];
-  // uint8_t z = 0;
+  uint8_t direction = 0; 
+  
+  uint8_t dist=0; //Distância a Objetos
 
-  uint8_t flag_reta = 0;
-  uint8_t detect_warning = 0;
+  struct flag_counter flag; //Structure with values of flags of the counters
+
+  uint8_t n_leds = 0; //0 = HeartBeat Led Blinks, 1 = HeartBeat and Status Led Blinks 
+
+  static const uint8_t distance = 25; //Minium Distance of Objects
 
   /*----------------------------------
           Infinite Run Loop
@@ -114,48 +126,64 @@ int main(void)
     /*----------------------------------
                 Heartbeat
     -----------------------------------*/
-    pisca_led();
+    pisca_led(n_leds);
 
     /*----------------------------------------------------
-        Get Modo by bluetooth and do stuff for each modo
+        Get Modo by bluetooth and do 'stuff' for each modo
     -----------------------------------------------------*/
     modo=recepcao_modo(modo);
 
     switch(modo){
       case STOP:
                 PORTC |= (1 << PC4) | (1 << PC5);
-                flag_reta = 0;
+                n_leds = 0;
                 break;
       case AGV:
 
                 PORTC |= (1 << PC4);
                 PORTC &=~ (1 << PC5);
 
+                n_leds = 0;
+
+                /*----------------------------------
+                              Obstacules
+                -----------------------------------*/
+
+                if (detet_obj(dist,distance) == 1){
+                  PORTC |= (1 << PC4) | (1 << PC5);
+                }
+
                 /*-----------------------------------------------
                       Get ADC values and store on Structure
                 -------------------------------------------------*/
                 s.canal_atual=valores_sensores(s.adc, s.n_canais, s.canal_atual);
-                conv_logica(s.boo, s.adc,127);
+                conv_logica(s.boo, s.adc, threshold);
 
                 /*-----------------------------------------------
                                 PID & Motor Action
                 -------------------------------------------------*/
-                pid_v.error = calculo_erro(s.boo, &modo_agv);
+                pid_v.error = calculo_erro(s.boo, &modo_agv, &intersection);
 
                 switch (modo_agv) {
                   case 0:
-                            OCR0A = 0;
-                            OCR0B = 0;
+
+                            if(intersection == 1){
+                              PORTC |= (1 << PC4) | (1 << PC5);
+                              pid_v.error = calculo_erro(s.boo, &modo_agv, &intersection);                              
+                              modo_agv = 0;
+                            }
+                            else{
+                              modo_agv = 2;
+                              reta = 0;
+                            }
                             break;
                   case 1:
                             PIDvalor = calculo_pid(&pid_v, &pid_k);
                             control_motor_PID(PIDvalor);
                             error_old = pid_v.error;
+                            reta = 0;
                             break;
                   case 2:
-                            // do{
-                            //   pid_v.error = calculo_erro(s.boo, &modo_agv);
-                            //   control_motor_PID(-127);
                             pid_v.error = error_old;
 
                             if(pid_v.error == 0){
@@ -165,122 +193,87 @@ int main(void)
                                 /*----------------------------------
                                            Get Values of Encoders
                                   -----------------------------------*/
-                                values_encoders(&encoders_values,0,0,&flag_reta);
+                                if (reta == 0){
+                                  values_encoders(&inicio_reta);
+                                  values_encoders(&encoders_values);
+                                  reta = 1;
+                                }
+
+                                reta_e.left = encoders_values.left - inicio_reta.left;
+                                reta_e.right = encoders_values.right - inicio_reta.right;
 
                                 /*-------------- --------------------
                                             Straight Line
                                 ----------------------------------*/
 
-                                pid_v_encoders.error = calculo_erro_encoder(&encoders_values);
+                                pid_v_encoders.error = calculo_erro_encoder(&reta_e);
                                 PIDvalor_encoders = calculo_pid(&pid_v_encoders,&pid_k_encoders);
                                 control_motor_PID(PIDvalor_encoders);
                             }
 
-                            else{
+                            else{ //90Degrees
+                              
+                              //Keep turning
                               PIDvalor = calculo_pid(&pid_v, &pid_k);
                               control_motor_PID(PIDvalor);
-                              break;
+                              reta = 0;
                             }
+                            break;
                 }
-
-                // if (pid_v.error == 100){
-                //   OCR0A = 0;
-                //   OCR0B = 0;
+                // flag_counters(&flag);
+                // if (modo_agv == 1){
+                //   reset_flag_counter2();
                 // }
-
-
-                //mot_sensor(s.boo);
-
-
-                /*----------------------------------
-                            Obstacules
-                -----------------------------------*/
-                // if (detet_obj(dist,25)==1){
-                //   OCR0A = 0;
-                //   OCR0B = 0;
+                // if (flag.c2 == 1){
+                //   modo = STOP;
                 // }
-
-                // if (z == 10000){
-                //   z=0;
-                //
-                //   m_itoa(PIDvalor, a);
-                //   memcpy(a+strlen(a),"\r\n",strlen("\r\n")+1);
-                // memcpy(a,"0",strlen(a)+1);
-                // for (uint8_t i = 0; i < s.n_canais + 1; i++){
-                //   a[i] = s.boo[i] + '0';
-                // }
-                // a[s.n_canais] = '\0';
-                // memcpy(a+strlen(a),"\r\n",strlen("\r\n")+1);
-                //   send_string(a);
-                // }
-                // else z++;
-
                 break;
+                
       case MANUAL:
-                if (controlo_manual() == 2){
-                  detect_warning = 0;
-                }
-                if (detect_warning == 0) {
-                  if (detet_obj(dist,25)==1){
-                    OCR0A = 0;
-                    OCR0B = 0;
-                    detect_warning = 1;
-                  }
-                }
-
+                n_leds = 0;
+                direction = controlo_manual(direction);
+                // if (direction != 2){
+                //   if (detet_obj(dist,distance) == 1){
+                //     PORTC |= (1 << PC4) | (1 << PC5);
+                //   }
+                // }
                 break;
 
-      case BACK_HOME:
+      case CAL:
+                n_leds = 1;
+                s.canal_atual=valores_sensores(s.adc, s.n_canais, s.canal_atual);
 
-                PORTC |= (1 << PC4);
-                PORTC &=~ (1 << PC5);
+                //Medium Value Between sensor on channel 0 and channel 1 (Center and Left Sensor)
+                threshold = calibr(s.adc[0],s.adc[1]);
 
-                /*----------------------------------
-                        Get Values of Encoders
-                -----------------------------------*/
-                values_encoders(&encoders_values,0,0,&flag_reta);
-
-                /*----------------------------------
-                            Straight Line
-                ----------------------------------*/
-
-                pid_v_encoders.error = calculo_erro_encoder(&encoders_values);
-                PIDvalor_encoders = calculo_pid(&pid_v_encoders,&pid_k_encoders);
-                control_motor_PID(PIDvalor_encoders);
-
-                /*----------------------------------
-                              Obstacules
-                -----------------------------------*/
-
-                if (detet_obj(dist,25)==1){
-                    OCR0A = 0;
-                    OCR0B = 0;
-                }
-
-
-                m_itoa(encoders_values.left,esq);
-                m_itoa(encoders_values.right,dir);
-                //
-                memcpy(a, "E", strlen("E")+1);
-                memcpy(a+strlen(a), esq, strlen(esq)+1);
-                memcpy(a+strlen(a), "D", strlen("D")+1);
-                memcpy(a+strlen(a), dir, strlen(esq)+1);
-                memcpy(a+strlen(a), "\r\n", strlen("\r\n")+1);
-                send_string(a);
+                //Medium Value Between sensor on channel 0 and channel 3 (Center and Back Sensor)
+                //threshold = calibr(s.adc[0],s.adc[3]); 
                 break;
     }
-    //leituras_encoder();
+    /*----------------------------------
+           Send Trigger Ultrasonic
+                    and 
+        Calculate distance of objects
+    -----------------------------------*/
     send_trigger();
     dist=calc_dist_cm(dist);
-    // if (detet_obj(dist,15)==1){
-    //   control_motor_obstacule();
-    // }
-    //detet_obj(dist,15);
+
+    /*----------------------------------
+           Get Values of Encoders
+    -----------------------------------*/
+    values_encoders(&encoders_values);
+
+    /*---------------------------------------------
+          Transmit Encoders Values when Requested
+    ----------------------------------------------*/    
+    if (ask_string_by_uart() == 1){
+      string = leituras_encoder(encoders_values);
+      send_string(string);
+    }
 
   /*----------------------------------
               END OF LOOP
   -----------------------------------*/
-
   }
   return 0;
 }

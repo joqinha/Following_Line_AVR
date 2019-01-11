@@ -1,7 +1,5 @@
 #ifndef _LED_H_
 #define _LED_H_
 
-void timer2_init(void);
-void pisca_led(void);
-
+void pisca_led(uint8_t n_leds);
 #endif

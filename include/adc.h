@@ -22,6 +22,7 @@ typedef struct{
 void adc_config(void);
 uint8_t valores_sensores(uint8_t *buf, uint8_t n_canais, uint8_t i);
 void conv_logica(uint8_t *out, uint8_t *buf, uint8_t threshold);
-void mot_sensor(uint8_t *str);
+uint8_t calibr(uint8_t canal0, uint8_t canal1);
+//void mot_sensor(uint8_t *str);
 
 #endif

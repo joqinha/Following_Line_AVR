@@ -32,7 +32,8 @@ uint8_t USART_Receive(void);
 void USART_Transmit(uint8_t data);
 
 uint8_t recepcao_modo(uint8_t valor);
-uint8_t controlo_manual(void);
+uint8_t controlo_manual(uint8_t direction);
+uint8_t ask_string_by_uart(void);
 
 void send_string(char c[]);
 

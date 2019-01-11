@@ -13,13 +13,14 @@
          0         1      0           x       0
          0         1      1           x      -1
          0         0      1           x      -2
-         1         1      1           x       0 - INTERCEPÇAO OU SEM LINHA (FAZER RETA)
-         0         0      0           0      -- - FORA DE PISTA - PARAR
+         1         0      1           x       2 - Escolher esquerda em caso de biforcação
+         1         1      1           1       0 - INTERCEPÇAO 
+         0         0      0           0      -- - FORA DE PISTA - PARAR OU SEM LINHA (FAZER RETA)
          0         0      0           1      -- - STOP SIGNAL - PARAR
 
 --------------------------------------------------------------------------------------*/
 
-int8_t calculo_erro(uint8_t valores[], uint8_t *modo){
+int8_t calculo_erro(uint8_t valores[], uint8_t *modo, uint8_t *intersection){
   int8_t erro = 0;
   if ((valores[1]==0) && (valores[0]==0) && (valores[2]==1)){
     erro = -2;
@@ -32,6 +33,7 @@ int8_t calculo_erro(uint8_t valores[], uint8_t *modo){
   else if ((valores[1]==0) && (valores[0]==1) && (valores[2]==0)){
     erro = 0;
     *modo = 1;
+    *intersection = 0;
   }
   else if ((valores[1]==1) && (valores[0]==1) && (valores[2]==0)){
     erro = 1;
@@ -41,8 +43,13 @@ int8_t calculo_erro(uint8_t valores[], uint8_t *modo){
     erro = 2;
     *modo = 1;
   }
-  else if ((valores[1]==1) && valores[0]==1 && valores[2]==1){
+  else if ((valores[1]==1) && valores[0]==1 && valores[2]==1 && valores[3] == 1){
     erro = 0;
+    *modo = 1;
+    *intersection = 1;
+  }
+  else if ((valores[1]==1) && valores[2]==1){
+    erro = 2;
     *modo = 1;
   }
   else if ((valores[1]==0) && valores[0]==0 && valores[2]==0 && valores[3] == 1){
@@ -73,9 +80,9 @@ int8_t calculo_pid(struct PID_variables *p1,struct PID_constants *p2){
                   OCR0B = RIGHT
 -------------------------------------------------*/
 
-void control_motor_PID(int8_t pid){
-  uint8_t speed_right = 255;
-  uint8_t speed_left = 255;
+void control_motor_PID(int16_t pid){
+  uint8_t speed_right = 218;
+  uint8_t speed_left = 218;
 
 
   /*-----------------------------------------------
@@ -103,16 +110,4 @@ void control_motor_PID(int8_t pid){
     OCR0A = speed_left;
     OCR0B = speed_right;
   }
-}
-
-void control_motor_obstacule(void){
-  OCR0A = 0;
-  OCR0B = 0;
-
-  OCR0A = 255;
-  _delay_ms(500);
-  OCR0B = 255;
-  _delay_ms(500);
-  OCR0A = 0;
-  _delay_ms(500);
 }

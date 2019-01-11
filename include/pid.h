@@ -13,9 +13,8 @@ struct PID_constants{
   int8_t Kd;
 };
 
-int8_t calculo_erro(uint8_t valores[], uint8_t *modo);
+int8_t calculo_erro(uint8_t valores[], uint8_t *modo, uint8_t *intersection);
 int8_t calculo_pid(struct PID_variables *p1,struct PID_constants *p2);
-void control_motor_PID(int8_t pid);
-void control_motor_obstacule(void);
+void control_motor_PID(int16_t pid);
 
 #endif

@@ -2,9 +2,10 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
+#include "init.h"
 #include "ultrasonic.h"
 
-extern volatile uint8_t flag_trigger;
+struct flag_counter flag;
 
 volatile uint16_t ticks_t1;
 volatile uint16_t ticks_t2;
@@ -16,34 +17,31 @@ volatile edge_t edge;
 
 void Ultrasonic_Init(void)
 {
-  DDRD |= (1 << Trigger_pin); //Trigger Pin Output
-  PORTD |= (0 << Trigger_pin);
+  	DDRD |= (1 << Trigger_pin); 
+  	PORTD |= (0 << Trigger_pin);
 
-  //Test led
-  DDRB |= (1 << PB1);
-
-	//Echo Pin
 	DDRB |= (0 << Echo_Pin);
 	PORTB |= (1 << Echo_Pin);
 
-  //Timer1 Initi
+  	//Timer1 Initi
 
 	TIMSK1 = (1 << ICIE1); //Input Capture interrupt
 	edge.current_edge = INIT_RISING;
 	edge.next_edge = INIT_RISING;
 
-  TCCR1B = (1 << ICES1) | (1 << ICNC1); //Rising Edge & Noise cancelation
-  TCCR1B |= (1 << CS12); //Prescaler 256
+  	TCCR1B = (1 << ICES1) | (1 << ICNC1); //Rising Edge & Noise cancelation
+  	TCCR1B |= (1 << CS12); //Prescaler 256
 
 	//TIMSK1 |= (1 << TOIE1); //Overflow Interrupt
 }
 
 void send_trigger(void){
-	if (flag_trigger==1){
+	flag_counters(&flag);
+	if (flag.begin==1){
 		PORTD |= (1 << Trigger_pin);
 		_delay_us(20);
 		PORTD &=~(1 << Trigger_pin);
-		flag_trigger=0;
+		reset_flag_counter_begin();
 	}
 }
 
@@ -74,7 +72,7 @@ ISR(TIMER1_CAPT_vect) {
 }
 
 uint8_t calc_dist_cm(uint8_t d_cm){
-  if (edge.current_edge == FALLING) {
+  	if (edge.current_edge == FALLING) {
 		uint16_t dticks = 0;
 		uint16_t t_us = 0;
 		if (ticks_t2 > ticks_t1){
@@ -95,7 +93,7 @@ int8_t detet_obj(uint8_t distance, uint8_t dist_ativ){
 		return 1;
 	}
 	else {
-		PORTB &=~(1 << PB1);
+		PORTB &=~ (1 << PB1);
 		return 0;
 	}
 	return -1;

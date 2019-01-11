@@ -31,7 +31,7 @@ ISR(USART_RX_vect)
 {
   if(usart.tx_flag != BUSY){
     usart.rx_buffer[usart.cnt_rx] = UDR0;
-    if (usart.rx_buffer[usart.cnt_rx] == '\r'){
+    if (usart.rx_buffer[usart.cnt_rx] == '\n'){
       usart.rx_flag = NOT_BUSY;
       if(usart.cnt_rx >= BUFFER_SIZE){
         usart.cnt_rx = 0;
@@ -82,7 +82,7 @@ uint8_t recepcao_modo(uint8_t valor)
                     valor=2;
                     usart.cnt_rx = 0;
                     break;
-          case '3':
+          case 'C':
                     valor=3;
                     usart.cnt_rx = 0;
                     break;
@@ -96,7 +96,7 @@ uint8_t recepcao_modo(uint8_t valor)
   return valor;
 }
 
-uint8_t controlo_manual(void){
+uint8_t controlo_manual(uint8_t direction){
   if (usart.rx_flag==NOT_BUSY){
     for(uint8_t i = 0; i < usart.cnt_rx; i++){
       if (usart.rx_buffer[i]=='D'){
@@ -136,7 +136,19 @@ uint8_t controlo_manual(void){
       }
     }
   }
-  return 0;
+  return direction;
+}
+
+uint8_t ask_string_by_uart(void){
+  if (usart.rx_flag==NOT_BUSY){
+    for(uint8_t i = 0; i < usart.cnt_rx; i++){
+      if (usart.rx_buffer[i]=='T'){
+        usart.cnt_rx = 0;
+        return 1;
+      }
+    }
+  }
+  return 0 ;
 }
 
 void send_string(char c[]){
